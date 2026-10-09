@@ -268,12 +268,14 @@ button.room-name svg { flex: none; color: var(--faint); }
   * { animation: none !important; }
 }
 
-/* 說明 */
-.help { display: flex; flex-direction: column; gap: 12px; }
-.help p { line-height: 1.7; }
-.help-steps, .help-notes { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
-.help-notes { color: var(--muted); font-size: 0.9rem; }
-.help .block { margin-top: 6px; }
+/* 說明：內容需在小螢幕手機上一頁顯示完，不需捲動 */
+.help { display: flex; flex-direction: column; gap: 12px; font-size: 15px; }
+.help h2 { font-size: 1.15rem; }
+.help p { line-height: 1.6; }
+.help-steps, .help-notes { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
+.help-steps { padding-top: 12px; border-top: 1.5px dashed var(--ink); }
+.help-notes { color: var(--muted); font-size: 13.5px; padding-top: 12px; border-top: 1.5px dashed var(--ink); }
+.help .block { margin-top: 4px; }
 
 /* 選單 */
 .menu { display: flex; flex-direction: column; }
