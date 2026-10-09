@@ -54,6 +54,8 @@ const renameInput = ref('')
 const expandedId = ref<string | null>(null)
 /** 房主關掉過的加入申請彈窗，不再自動彈出（仍可在成員列表處理） */
 const dismissedRequests = ref(new Set<string>())
+/** 結算後帳目清單預設收起，避免結算單下方還要捲很長 */
+const showSettledItems = ref(false)
 
 const isHost = computed(() => props.role === 'host')
 const connected = computed(() => props.status.kind === 'ready')
@@ -202,7 +204,17 @@ function reload() {
         @intent="emit('intent', $event)"
       />
 
-      <section class="paper">
+      <button
+        v-if="settlement && state.expenses.length"
+        type="button"
+        class="outline block items-toggle"
+        :aria-expanded="showSettledItems"
+        @click="showSettledItems = !showSettledItems"
+      >
+        {{ showSettledItems ? '收起帳目' : `查看帳目（${state.expenses.length} 筆）` }}
+      </button>
+
+      <section v-if="!settlement || showSettledItems" class="paper">
         <button
           v-if="!settlement && myBalance && state.expenses.length"
           type="button"
