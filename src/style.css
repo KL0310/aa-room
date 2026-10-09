@@ -108,7 +108,9 @@ button.icon-button { min-height: 44px; width: 44px; padding: 0; display: flex; a
 .button-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; }
 
 /* 首頁 */
-.brand { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 28px 0 24px; }
+.home-top { display: flex; justify-content: flex-end; }
+.brand { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 4px 0 24px; }
+.brand svg { margin-bottom: 8px; }
 .brand h1 { font-size: 2.6rem; font-weight: 700; letter-spacing: 0.08em; }
 .brand p { color: var(--muted); }
 .invite-code { display: flex; flex-direction: column; align-items: center; gap: 2px; }
@@ -256,3 +258,10 @@ button.room-name svg { flex: none; color: var(--faint); }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; }
 }
+
+/* 說明 */
+.help { display: flex; flex-direction: column; gap: 12px; }
+.help p { line-height: 1.7; }
+.help-steps, .help-notes { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
+.help-notes { color: var(--muted); font-size: 0.9rem; }
+.help .block { margin-top: 6px; }

@@ -2,6 +2,8 @@
 import { computed, ref } from 'vue'
 import { normalizeRoomCode } from '../room/roomCode'
 import { NICKNAME_MAX_LENGTH, ROOM_NAME_MAX_LENGTH, cleanNickname, defaultRoomName } from '../room/roomState'
+import AppLogo from './AppLogo.vue'
+import HelpSheet from './HelpSheet.vue'
 
 const props = defineProps<{
   initialCode: string | null
@@ -18,6 +20,7 @@ const roomName = ref('')
 const codeInput = ref(props.initialCode ?? '')
 // 從 QR code / 分享連結進來時，只顯示加入房間
 const invited = ref(props.initialCode !== null)
+const showHelp = ref(false)
 
 const cleanedNickname = computed(() => cleanNickname(nickname.value))
 const normalizedCode = computed(() => normalizeRoomCode(codeInput.value))
@@ -35,8 +38,13 @@ function join() {
 
 <template>
   <section class="home">
+    <div class="home-top">
+      <button type="button" class="icon-button outline" aria-label="這是什麼？" @click="showHelp = true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3" /><path d="M12 17h.01" /></svg>
+      </button>
+    </div>
     <header class="brand">
-      <span class="mono-label">P2P · NO SIGN-UP</span>
+      <AppLogo :size="72" />
       <h1 class="mono">AA ROOM</h1>
       <p>聚會分帳，開個房間就好</p>
     </header>
@@ -91,5 +99,7 @@ function join() {
         <button class="outline block" :disabled="!cleanedNickname || !normalizedCode" @click="join">加入房間</button>
       </template>
     </div>
+
+    <HelpSheet v-if="showHelp" @close="showHelp = false" />
   </section>
 </template>
