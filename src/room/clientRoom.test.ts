@@ -24,6 +24,20 @@ describe('ClientRoom', () => {
     expect(transport.sentTo('host-peer')).toEqual([hello, hello])
   })
 
+  it('沿用已連上的連線時，建立後立即報到', () => {
+    const transport = new FakeTransport<ClientMessage>()
+    const callbacks = { onState: vi.fn(), onError: vi.fn(), onMembership: vi.fn() }
+    new ClientRoom(transport, 'me', '小明', callbacks, 'host-peer')
+    expect(transport.sentTo('host-peer')).toEqual([hello])
+  })
+
+  it('忽略加入前的房間資訊回覆', () => {
+    const { transport, onState, onMembership } = setup()
+    transport.simulateMessage('host-peer', { type: 'roomInfo', info: { name: 'x', hostNickname: 'y' } })
+    expect(onState).not.toHaveBeenCalled()
+    expect(onMembership).not.toHaveBeenCalled()
+  })
+
   it('未連線時操作不會送出', () => {
     const { transport, room } = setup()
     room.dispatch({ kind: 'addExpense', title: '晚餐', amount: 100 })

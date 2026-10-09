@@ -23,6 +23,8 @@ export class ClientRoom {
     private readonly clientId: string,
     private readonly nickname: string,
     private readonly callbacks: ClientRoomCallbacks,
+    /** 沿用受邀畫面已建立好的連線時，傳入已連上的房主 peer，建立後立即報到 */
+    connectedHostPeerId: string | null = null,
   ) {
     this.unsubscribes.push(
       // 每次（重新）連上房主都要重新報到，房主才知道這條連線屬於誰
@@ -35,6 +37,10 @@ export class ClientRoom {
       }),
       transport.onMessage((_peerId, data) => this.handleMessage(data)),
     )
+    if (connectedHostPeerId) {
+      this.hostPeerId = connectedHostPeerId
+      this.sendHello()
+    }
   }
 
   get connectedPeerId(): string | null {
@@ -71,6 +77,9 @@ export class ClientRoom {
     switch (data.type) {
       case 'error':
         this.callbacks.onError(data.reason)
+        return
+      case 'roomInfo':
+        // 受邀畫面才需要，加入後忽略
         return
       case 'removed':
       case 'pending':

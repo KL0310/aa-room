@@ -18,6 +18,7 @@ import {
 import { PeerClientTransport } from './transport/peerClientTransport'
 import { PeerHostTransport } from './transport/peerHostTransport'
 import type { ConnectionKind, Transport, TransportStatus } from './transport/types'
+import { InvitePreview, type InviteInfo } from './invitePreview'
 import { acquireTabLock } from './tabLock'
 
 export type Role = 'host' | 'member'
@@ -40,12 +41,15 @@ export function useRoomSession() {
   const membership = ref<Membership>('joining')
   /** 成員 id → 連線類型。房主看得到每位成員；成員只看得到自己與房主之間的連線 */
   const connectionKinds = ref<Record<string, ConnectionKind>>({})
+  /** 受邀畫面向房主詢問到的房間資訊 */
+  const inviteInfo = shallowRef<InviteInfo | null>(null)
 
   let transport: Transport<HostMessage> | Transport<ClientMessage> | null = null
   let hostRoom: HostRoom | null = null
   let clientRoom: ClientRoom | null = null
   let pollTimer: ReturnType<typeof setInterval> | undefined
   let releaseTabLock: (() => void) | null = null
+  let preview: InvitePreview | null = null
   /** 每次開始或結束一個房間都會遞增，用來放棄已經過時的非同步啟動流程 */
   let generation = 0
 
@@ -61,7 +65,27 @@ export function useRoomSession() {
   function joinRoom(code: string, nickname: string): void {
     saveNickname(nickname)
     saveSession({ code, role: 'member', nickname })
-    startMember(code, nickname)
+    // 受邀畫面已連上同一個房間時，沿用那條連線（接手後不能再關閉它）
+    const taken = preview?.code === code ? preview.takeOver() : null
+    if (taken) {
+      preview = null
+      inviteInfo.value = null
+    } else {
+      stopPreview()
+    }
+    startMember(code, nickname, taken)
+  }
+
+  /** 進入受邀畫面時呼叫：先連上房主取得房間名稱 */
+  function startPreview(code: string): void {
+    stopPreview()
+    preview = new InvitePreview(code, (info) => (inviteInfo.value = info))
+  }
+
+  function stopPreview(): void {
+    preview?.close()
+    preview = null
+    inviteInfo.value = null
   }
 
   /** 重新整理頁面後，依本機保存的 session 自動回到原本的房間；回傳是否有恢復 */
@@ -116,9 +140,16 @@ export function useRoomSession() {
     startPolling()
   }
 
-  async function startMember(code: string, nickname: string): Promise<void> {
-    if (!(await enterRoom('member', code))) return
-    const t = new PeerClientTransport<ClientMessage>(code)
+  async function startMember(
+    code: string,
+    nickname: string,
+    existing: ReturnType<InvitePreview['takeOver']> = null,
+  ): Promise<void> {
+    if (!(await enterRoom('member', code))) {
+      existing?.transport.close()
+      return
+    }
+    const t = existing?.transport ?? new PeerClientTransport<ClientMessage>(code)
     transport = t
     t.onStatusChange((s) => (status.value = s))
     clientRoom = new ClientRoom(t, clientId, nickname, {
@@ -132,8 +163,8 @@ export function useRoomSession() {
         // 這兩種情況重連也不會改善，停止連線
         if (reason === 'same-device-as-host' || reason === 'version-mismatch') t.close()
       },
-    })
-    t.start()
+    }, existing?.hostPeerId ?? null)
+    if (!existing) t.start()
     startPolling()
   }
 
@@ -207,6 +238,7 @@ export function useRoomSession() {
     notice,
     membership,
     connectionKinds,
+    inviteInfo,
     joinUrl,
     createRoom,
     joinRoom,
@@ -214,6 +246,8 @@ export function useRoomSession() {
     leave,
     dispatch,
     requestRejoin,
+    startPreview,
+    stopPreview,
   }
 }
 

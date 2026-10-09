@@ -113,8 +113,10 @@ button.icon-button { min-height: 44px; width: 44px; padding: 0; display: flex; a
 .app-logo { display: inline-flex; align-items: center; gap: 0.2em; }
 .app-logo .wordmark { font-weight: 700; letter-spacing: 0.06em; line-height: 1; white-space: nowrap; }
 .brand p { color: var(--muted); }
-.invite-code { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.code-big { font-size: 34px; font-weight: 700; letter-spacing: 0.2em; }
+.invite-target { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-height: 92px; justify-content: center; }
+.invite-name { font-size: 24px; font-weight: 900; overflow-wrap: anywhere; }
+.invite-code-fallback { font-size: 22px; font-weight: 700; letter-spacing: 0.2em; }
+.loading { animation: blink 0.9s infinite alternate; }
 
 /* 房間頁首 */
 /* 記帳中：整頁固定為一個螢幕高，只有帳目清單捲動；收支摘要與合計固定在收據上下 */

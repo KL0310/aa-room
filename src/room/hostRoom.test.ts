@@ -42,6 +42,25 @@ describe('HostRoom', () => {
     expect(room.current.members).toHaveLength(2)
   })
 
+  it('peek 只回覆房間名稱與房主暱稱，不會加入成員，也不會收到之後的廣播', () => {
+    transport.simulateMessage('peer-x', { type: 'peek', protocolVersion: PROTOCOL_VERSION })
+    expect(transport.sentTo('peer-x')).toEqual([{ type: 'roomInfo', info: { name: '房主的房間', hostNickname: '房主' } }])
+    expect(room.current.members).toHaveLength(1)
+    room.dispatch({ kind: 'addExpense', title: 'x', amount: 1 })
+    expect(transport.sentTo('peer-x')).toHaveLength(1)
+  })
+
+  it('peek 之後在同一條連線報到即可加入', () => {
+    transport.simulateMessage('peer-x', { type: 'peek', protocolVersion: PROTOCOL_VERSION })
+    transport.simulateMessage('peer-x', hello('x', '小明'))
+    expect(lastState(transport, 'peer-x')?.members.map((m) => m.id)).toEqual(['host', 'x'])
+  })
+
+  it('peek 協定版本不一致時回覆錯誤', () => {
+    transport.simulateMessage('peer-x', { type: 'peek', protocolVersion: 1 })
+    expect(transport.sentTo('peer-x')).toEqual([{ type: 'error', reason: 'version-mismatch' }])
+  })
+
   it('協定版本不一致時拒絕', () => {
     transport.simulateMessage('peer-a', { ...hello('a', '小明'), protocolVersion: 1 })
     expect(transport.sentTo('peer-a')).toEqual([{ type: 'error', reason: 'version-mismatch' }])

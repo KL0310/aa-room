@@ -6,7 +6,9 @@ import { loadNickname } from './storage'
 import { readRoomFromUrl, useRoomSession } from './useRoomSession'
 
 const session = useRoomSession()
-session.resume()
+const invitedCode = readRoomFromUrl()
+// 透過邀請連結進來、且不是重新整理回到原本的房間時，先向房主詢問房間名稱
+if (!session.resume() && invitedCode) session.startPreview(invitedCode)
 </script>
 
 <template>
@@ -30,8 +32,10 @@ session.resume()
       v-else
       :initial-code="readRoomFromUrl()"
       :initial-nickname="loadNickname()"
+      :invite-info="session.inviteInfo.value"
       @create="session.createRoom"
       @join="session.joinRoom"
+      @cancel-invite="session.stopPreview"
     />
     <ConfirmDialog />
   </main>

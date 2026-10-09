@@ -1,7 +1,7 @@
 import type { RoundingMode, RoomState, SettlementMode } from './types'
 
 /** 協定有不相容的變更時遞增；GitHub Pages 有快取，成員可能還在用舊版頁面 */
-export const PROTOCOL_VERSION = 3
+export const PROTOCOL_VERSION = 4
 
 /** 成員可以送出的操作；是否允許由房主依權限判斷 */
 export type Intent =
@@ -26,10 +26,14 @@ export type ClientMessage =
       requestRejoin?: boolean
     }
   | { type: 'intent'; intent: Intent }
+  /** 尚未加入前詢問房間資訊（受邀畫面顯示房間名稱用），不會被列入成員 */
+  | { type: 'peek'; protocolVersion: number }
 
 /** 房主 → client */
 export type HostMessage =
   | { type: 'state'; state: RoomState }
+  /** 回覆 peek：只提供受邀畫面需要的資訊，不含帳目 */
+  | { type: 'roomInfo'; info: RoomInfo }
   /** 已被房主剔除，尚未申請重新加入 */
   | { type: 'removed' }
   /** 重新加入申請已送出，等待房主同意 */
@@ -37,6 +41,11 @@ export type HostMessage =
   /** 房主拒絕了重新加入申請 */
   | { type: 'rejected' }
   | { type: 'error'; reason: HostErrorReason }
+
+export interface RoomInfo {
+  name: string
+  hostNickname: string
+}
 
 export type HostErrorReason = 'same-device-as-host' | 'invalid-message' | 'version-mismatch'
 
@@ -52,6 +61,8 @@ export function isClientMessage(value: unknown): value is ClientMessage {
       )
     case 'intent':
       return isIntent(value.intent)
+    case 'peek':
+      return typeof value.protocolVersion === 'number'
     default:
       return false
   }
@@ -95,6 +106,8 @@ export function isHostMessage(value: unknown): value is HostMessage {
   switch (value.type) {
     case 'state':
       return isObject(value.state)
+    case 'roomInfo':
+      return isObject(value.info) && typeof value.info.name === 'string' && typeof value.info.hostNickname === 'string'
     case 'removed':
     case 'pending':
     case 'rejected':

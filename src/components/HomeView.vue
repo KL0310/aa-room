@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { InviteInfo } from '../invitePreview'
 import { normalizeRoomCode } from '../room/roomCode'
 import { NICKNAME_MAX_LENGTH, ROOM_NAME_MAX_LENGTH, cleanNickname, defaultRoomName } from '../room/roomState'
 import AppLogo from './AppLogo.vue'
@@ -8,11 +9,13 @@ import HelpSheet from './HelpSheet.vue'
 const props = defineProps<{
   initialCode: string | null
   initialNickname: string
+  inviteInfo: InviteInfo | null
 }>()
 
 const emit = defineEmits<{
   create: [nickname: string, roomName: string]
   join: [code: string, nickname: string]
+  cancelInvite: []
 }>()
 
 const nickname = ref(props.initialNickname)
@@ -25,6 +28,26 @@ const cleanedNickname = computed(() => cleanNickname(nickname.value))
 // 只能透過邀請連結（?room=）加入，首頁不提供輸入邀請碼
 const invitedCode = computed(() => (props.initialCode ? normalizeRoomCode(props.initialCode) : null))
 const roomNamePlaceholder = computed(() => defaultRoomName(cleanedNickname.value || '我'))
+
+const inviteError = computed(() => {
+  const info = props.inviteInfo
+  if (info?.status !== 'failed') return ''
+  switch (info.reason) {
+    case 'room-not-found':
+      return '找不到這個房間，房主可能已經離開或連結有誤'
+    case 'version-mismatch':
+      return '你和房主使用的版本不同，請兩邊都重新整理頁面。'
+    case 'browser-unsupported':
+      return '這個瀏覽器不支援 P2P 連線'
+    default:
+      return '暫時連不上房主'
+  }
+})
+
+function cancelInvite() {
+  invited.value = false
+  emit('cancelInvite')
+}
 
 function create() {
   if (cleanedNickname.value) emit('create', cleanedNickname.value, roomName.value)
@@ -60,12 +83,20 @@ function join() {
 
       <template v-if="invited">
         <div class="rule" />
-        <div class="invite-code">
-          <span class="hint">受邀加入房間</span>
-          <span class="mono code-big">{{ invitedCode }}</span>
+        <div class="invite-target" role="status">
+          <span class="hint">受邀加入</span>
+          <template v-if="inviteInfo?.status === 'ready'">
+            <strong class="invite-name">{{ inviteInfo.info.name }}</strong>
+            <span class="hint">房主：{{ inviteInfo.info.hostNickname }}</span>
+          </template>
+          <template v-else-if="inviteInfo?.status === 'failed'">
+            <span class="mono invite-code-fallback">{{ invitedCode }}</span>
+            <p class="error">{{ inviteError }}</p>
+          </template>
+          <span v-else class="hint loading">正在讀取房間資訊…</span>
         </div>
         <button class="ink block" :disabled="!cleanedNickname || !invitedCode" @click="join">加入房間</button>
-        <button class="text-link" @click="invited = false">改為開新房間</button>
+        <button class="text-link" @click="cancelInvite">改為開新房間</button>
       </template>
 
       <template v-else>

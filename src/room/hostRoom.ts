@@ -68,6 +68,18 @@ export class HostRoom {
       if (memberId) this.apply(memberId, data.intent)
       return
     }
+    if (data.type === 'peek') {
+      if (data.protocolVersion !== PROTOCOL_VERSION) {
+        this.transport.send(peerId, { type: 'error', reason: 'version-mismatch' })
+        return
+      }
+      const host = this.state.members.find((m) => m.id === this.state.hostId)
+      this.transport.send(peerId, {
+        type: 'roomInfo',
+        info: { name: this.state.name, hostNickname: host?.nickname ?? '' },
+      })
+      return
+    }
 
     // hello
     if (data.protocolVersion !== PROTOCOL_VERSION) {
