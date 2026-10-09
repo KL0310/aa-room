@@ -85,8 +85,8 @@ const statusText = computed(() => {
       return '已離線'
     case 'failed':
       return {
-        'room-not-found': '找不到這個房間，請確認邀請碼，或房主是否還在線上',
-        'room-code-taken': '邀請碼已被使用',
+        'room-not-found': '找不到這個房間，請確認邀請連結，或房主是否還在線上',
+        'room-code-taken': '房號已被使用',
         'browser-unsupported': '這個瀏覽器不支援 P2P 連線',
         unknown: '連線失敗',
       }[s.reason]
@@ -146,7 +146,7 @@ async function confirmLeave() {
   const ok = await confirmAction(
     isHost.value
       ? { title: '關閉房間？', message: '你是房主，離開後其他人將無法再同步。', confirmText: '離開', danger: true }
-      : { title: '離開房間？', message: '之後可以用邀請碼再加入。', confirmText: '離開' },
+      : { title: '離開房間？', message: '之後可以用邀請連結再加入。', confirmText: '離開' },
   )
   if (ok) emit('leave')
 }
@@ -256,7 +256,6 @@ function reload() {
     <InviteSheet
       v-if="sheet?.kind === 'invite'"
       :room-name="state?.name ?? roomCode"
-      :room-code="roomCode"
       :join-url="joinUrl"
       @close="sheet = null"
     />

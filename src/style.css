@@ -71,7 +71,6 @@ select {
 }
 input::placeholder { color: var(--faint); }
 input:focus, select:focus, button:focus-visible { outline: 2px solid var(--owe); outline-offset: 2px; }
-.code-input { text-transform: uppercase; letter-spacing: 0.3em; }
 .amount-input { font-size: 22px; font-weight: 700; text-align: right; }
 fieldset { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 legend { margin-bottom: 6px; }
@@ -263,7 +262,6 @@ button.room-name svg { flex: none; color: var(--faint); }
 .invite { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
 .qr-frame { border: 1.5px solid var(--ink); padding: 12px; background: #fff; line-height: 0; }
 .qr { width: 180px; height: 180px; }
-.invite .invite-code { width: 100%; border-top: 1.5px dashed var(--ink); padding-top: 14px; }
 .feedback { min-height: 1.4em; font-size: 0.85rem; color: var(--muted); }
 
 @media (prefers-reduced-motion: reduce) {

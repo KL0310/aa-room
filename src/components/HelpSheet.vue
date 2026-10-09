@@ -14,7 +14,7 @@ const emit = defineEmits<{ close: [] }>()
       <span class="mono-label">HOW IT WORKS</span>
       <ol class="help-steps">
         <li><strong>開房間</strong>：一個人開房，成為房主</li>
-        <li><strong>邀請</strong>：按「邀請」讓大家掃 QR code 或輸入邀請碼加入</li>
+        <li><strong>邀請</strong>：按「邀請」讓大家掃 QR code，或把連結傳給朋友</li>
         <li><strong>記一筆</strong>：誰付了錢，就由誰記下項目和金額</li>
         <li><strong>勾選參與</strong>：沒用到的項目，取消勾選自己就不用分攤</li>
         <li><strong>結算</strong>：房主按下結算，每個人都會看到要付給誰、付多少</li>

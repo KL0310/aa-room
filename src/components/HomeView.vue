@@ -17,14 +17,13 @@ const emit = defineEmits<{
 
 const nickname = ref(props.initialNickname)
 const roomName = ref('')
-const codeInput = ref(props.initialCode ?? '')
 // 從 QR code / 分享連結進來時，只顯示加入房間
 const invited = ref(props.initialCode !== null)
 const showHelp = ref(false)
 
 const cleanedNickname = computed(() => cleanNickname(nickname.value))
-const normalizedCode = computed(() => normalizeRoomCode(codeInput.value))
-const codeError = computed(() => codeInput.value.trim() !== '' && normalizedCode.value === null)
+// 只能透過邀請連結（?room=）加入，首頁不提供輸入邀請碼
+const invitedCode = computed(() => (props.initialCode ? normalizeRoomCode(props.initialCode) : null))
 const roomNamePlaceholder = computed(() => defaultRoomName(cleanedNickname.value || '我'))
 
 function create() {
@@ -32,7 +31,7 @@ function create() {
 }
 
 function join() {
-  if (cleanedNickname.value && normalizedCode.value) emit('join', normalizedCode.value, cleanedNickname.value)
+  if (cleanedNickname.value && invitedCode.value) emit('join', invitedCode.value, cleanedNickname.value)
 }
 </script>
 
@@ -56,7 +55,7 @@ function join() {
           :maxlength="NICKNAME_MAX_LENGTH"
           placeholder="例如：小明"
           autocomplete="nickname"
-          @keyup.enter="invited ? join() : undefined"
+          @keyup.enter="invited ? join() : create()"
         />
       </label>
 
@@ -64,10 +63,10 @@ function join() {
         <div class="rule" />
         <div class="invite-code">
           <span class="hint">受邀加入房間</span>
-          <span class="mono code-big">{{ normalizedCode }}</span>
+          <span class="mono code-big">{{ invitedCode }}</span>
         </div>
-        <button class="ink block" :disabled="!cleanedNickname || !normalizedCode" @click="join">加入房間</button>
-        <button class="text-link" @click="invited = false">改為開新房間或輸入其他邀請碼</button>
+        <button class="ink block" :disabled="!cleanedNickname || !invitedCode" @click="join">加入房間</button>
+        <button class="text-link" @click="invited = false">改為開新房間</button>
       </template>
 
       <template v-else>
@@ -78,24 +77,6 @@ function join() {
           <input v-model="roomName" :maxlength="ROOM_NAME_MAX_LENGTH" :placeholder="roomNamePlaceholder" />
         </label>
         <button class="ink block" :disabled="!cleanedNickname" @click="create">開新房間</button>
-
-        <div class="rule" />
-        <span class="mono-label">JOIN</span>
-        <label class="field">
-          <span class="field-label">邀請碼</span>
-          <input
-            v-model="codeInput"
-            class="mono code-input"
-            maxlength="7"
-            placeholder="6 碼"
-            autocapitalize="characters"
-            autocomplete="off"
-            spellcheck="false"
-            @keyup.enter="join"
-          />
-        </label>
-        <p v-if="codeError" class="error">邀請碼格式不正確</p>
-        <button class="outline block" :disabled="!cleanedNickname || !normalizedCode" @click="join">加入房間</button>
       </template>
     </div>
 
