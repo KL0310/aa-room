@@ -18,7 +18,7 @@ import JoinRequests from './JoinRequests.vue'
 import MemberList from './MemberList.vue'
 import MembershipNotice from './MembershipNotice.vue'
 import SettlementResult from './SettlementResult.vue'
-import SettlePanel from './SettlePanel.vue'
+import SettleSheet from './SettleSheet.vue'
 
 const props = defineProps<{
   role: Role
@@ -38,24 +38,38 @@ const emit = defineEmits<{
   leave: []
 }>()
 
-/** 目前開啟的底部表單；edit 時帶著要編輯的帳目 */
-type Sheet = { kind: 'invite' } | { kind: 'add' } | { kind: 'edit'; expense: Expense } | { kind: 'rename' }
+/** 目前開啟的底部表單；同一時間只開一個 */
+type Sheet =
+  | { kind: 'invite' }
+  | { kind: 'add' }
+  | { kind: 'edit'; expense: Expense }
+  | { kind: 'rename' }
+  | { kind: 'members' }
+  | { kind: 'balances' }
+  | { kind: 'settle' }
+  | { kind: 'menu' }
 const sheet = ref<Sheet | null>(null)
 const renameInput = ref('')
+/** 同一時間只展開一筆帳目 */
+const expandedId = ref<string | null>(null)
+/** 房主關掉過的加入申請彈窗，不再自動彈出（仍可在成員列表處理） */
+const dismissedRequests = ref(new Set<string>())
 
 const isHost = computed(() => props.role === 'host')
 const connected = computed(() => props.status.kind === 'ready')
 const settlement = computed(() => props.state?.settlement ?? null)
 const total = computed(() => props.state?.expenses.reduce((sum, e) => sum + e.amount, 0) ?? 0)
-const hostName = computed(() => props.state?.members.find((m) => m.id === props.state?.hostId)?.nickname ?? '')
 const onlineCount = computed(() => props.state?.members.filter((m) => m.online).length ?? 0)
 /** 結算前的即時預覽，以進位計算；實際結果依房主結算時的選擇 */
 const previewBalances = computed(() =>
   props.state ? computeBalances(props.state.members, props.state.expenses, 'ceil') : {},
 )
 const myBalance = computed(() => previewBalances.value[props.clientId] ?? null)
-const showRoom = computed(
-  () => props.state && (isHost.value || !['removed', 'pending', 'rejected'].includes(props.membership)),
+const isOutsider = computed(() => !isHost.value && ['removed', 'pending', 'rejected'].includes(props.membership))
+const showRoom = computed(() => !!props.state && !isOutsider.value)
+const pendingRequests = computed(() => (isHost.value ? (props.state?.joinRequests ?? []) : []))
+const promptRequest = computed(() =>
+  sheet.value ? null : (pendingRequests.value.find((r) => !dismissedRequests.value.has(r.id)) ?? null),
 )
 
 const statusText = computed(() => {
@@ -64,7 +78,7 @@ const statusText = computed(() => {
     case 'connecting':
       return isHost.value ? '正在開啟房間…' : '正在連線到房主…'
     case 'ready':
-      return props.state ? `已連線 · ${onlineCount.value}/${props.state.members.length} 人在線` : '已連線'
+      return props.state ? `${onlineCount.value}/${props.state.members.length} 人在線` : '已連線'
     case 'reconnecting':
       return `連線中斷，重新連線中（第 ${s.attempt} 次）`
     case 'closed':
@@ -95,6 +109,10 @@ const noticeText = computed(() => {
   }
 })
 
+function toggleExpense(id: string) {
+  expandedId.value = expandedId.value === id ? null : id
+}
+
 function submitExpense(draft: ExpenseDraft) {
   const current = sheet.value
   if (current?.kind === 'edit') emit('intent', { kind: 'updateExpense', expenseId: current.expense.id, ...draft })
@@ -103,7 +121,7 @@ function submitExpense(draft: ExpenseDraft) {
 }
 
 function openRename() {
-  if (!isHost.value || !props.state) return
+  if (!props.state) return
   renameInput.value = props.state.name
   sheet.value = { kind: 'rename' }
 }
@@ -115,7 +133,16 @@ function submitRename() {
   sheet.value = null
 }
 
+function resolveRequest(memberId: string, approve: boolean) {
+  emit('intent', { kind: 'resolveJoinRequest', memberId, approve })
+}
+
+function dismissRequest(memberId: string) {
+  dismissedRequests.value = new Set([...dismissedRequests.value, memberId])
+}
+
 async function confirmLeave() {
+  sheet.value = null
   const ok = await confirmAction(
     isHost.value
       ? { title: '關閉房間？', message: '你是房主，離開後其他人將無法再同步。', confirmText: '離開', danger: true }
@@ -133,32 +160,39 @@ function reload() {
   <section class="room" :class="{ 'has-dock': showRoom && !settlement }">
     <header class="room-header">
       <div class="title-block">
-        <span class="mono-label">AA ROOM{{ hostName ? ` · 房主 ${hostName}` : '' }}</span>
-        <button v-if="isHost && state" type="button" class="room-name editable" aria-label="修改房間名稱" @click="openRename">
-          {{ state.name }}
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+        <h1 class="room-name">{{ state?.name ?? '連線中…' }}</h1>
+        <button
+          v-if="showRoom && connected"
+          type="button"
+          class="presence-button mono"
+          @click="sheet = { kind: 'members' }"
+        >
+          <span class="dot" />{{ statusText }} ›
+          <span v-if="pendingRequests.length" class="alert-dot" aria-label="有加入申請" />
         </button>
-        <h1 v-else class="room-name">{{ state?.name ?? '連線中…' }}</h1>
+        <p v-else class="status mono" :class="status.kind" role="status"><span class="dot" />{{ statusText }}</p>
       </div>
-      <button type="button" class="outline" @click="sheet = { kind: 'invite' }">邀請</button>
+      <div class="header-actions">
+        <button type="button" class="outline" @click="sheet = { kind: 'invite' }">邀請</button>
+        <button type="button" class="icon-button" aria-label="更多" @click="sheet = { kind: 'menu' }">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="19" cy="12" r="2" /></svg>
+        </button>
+      </div>
     </header>
 
-    <p class="status mono" :class="status.kind" role="status"><span class="dot" />{{ statusText }}</p>
-    <p v-if="noticeText" class="error">
+    <p v-if="noticeText" class="error notice-line">
       {{ noticeText }}
       <button v-if="notice === 'version-mismatch'" class="text-link" @click="reload">重新整理</button>
     </p>
 
     <MembershipNotice
-      v-if="!isHost && ['removed', 'pending', 'rejected'].includes(membership)"
+      v-if="isOutsider"
       :membership="membership"
       @request-rejoin="emit('requestRejoin')"
       @leave="confirmLeave"
     />
 
     <template v-else-if="state">
-      <JoinRequests v-if="isHost && state.joinRequests.length" :requests="state.joinRequests" @intent="emit('intent', $event)" />
-
       <SettlementResult
         v-if="settlement"
         :state="state"
@@ -169,20 +203,22 @@ function reload() {
       />
 
       <section class="paper">
-        <div v-if="!settlement && myBalance && state.expenses.length" class="balance-head">
-          <span class="hint">{{ myBalance.net < 0 ? '目前你應付' : myBalance.net > 0 ? '目前你應收' : '目前你' }}</span>
-          <span class="mono hero-amount" :class="{ owe: myBalance.net < 0 }">
-            {{ myBalance.net === 0 ? '打平' : formatAmount(Math.abs(myBalance.net)) }}
+        <button
+          v-if="!settlement && myBalance && state.expenses.length"
+          type="button"
+          class="balance-head"
+          @click="sheet = { kind: 'balances' }"
+        >
+          <span class="balance-figure">
+            <span class="hint">{{ myBalance.net < 0 ? '目前你應付' : myBalance.net > 0 ? '目前你應收' : '目前你' }}</span>
+            <span class="mono hero-amount" :class="{ owe: myBalance.net < 0 }">
+              {{ myBalance.net === 0 ? '打平' : formatAmount(Math.abs(myBalance.net)) }}
+            </span>
           </span>
-          <span class="mono meta">已付 {{ formatAmount(myBalance.paid) }} ／ 應分擔 {{ formatAmount(myBalance.share) }}</span>
-        </div>
+          <span class="hint">大家的收支 ›</span>
+        </button>
 
-        <div class="section-head">
-          <span class="mono-label">ITEM</span>
-          <span class="mono-label">AMOUNT</span>
-        </div>
         <p v-if="!state.expenses.length" class="hint empty">還沒有帳目。誰先付了錢，就由誰記一筆。</p>
-        <p v-else-if="!settlement" class="hint">點名字切換是否參與；你可以切換自己的{{ isHost ? '，房主可以切換所有人的' : '' }}</p>
         <ul class="line-items">
           <ExpenseItem
             v-for="e in state.expenses"
@@ -192,48 +228,70 @@ function reload() {
             :client-id="clientId"
             :is-host="isHost"
             :locked="!!settlement || !connected"
+            :expanded="expandedId === e.id"
+            @toggle="toggleExpense(e.id)"
             @intent="emit('intent', $event)"
             @edit="sheet = { kind: 'edit', expense: $event }"
           />
         </ul>
-        <div class="total-row mono">
+        <div v-if="state.expenses.length" class="total-row mono">
           <span>TOTAL</span>
           <span>{{ formatAmount(total) }}</span>
         </div>
       </section>
-
-      <section v-if="!settlement && state.expenses.length" class="paper">
-        <span class="mono-label">BALANCE · 預覽</span>
-        <p class="hint">以小數進位計算；實際結果以房主結算時的選擇為準</p>
-        <BalanceSummary :members="state.members" :balances="previewBalances" :client-id="clientId" />
-      </section>
-
-      <MemberList
-        :state="state"
-        :client-id="clientId"
-        :is-host="isHost"
-        :connection-kinds="connectionKinds"
-        @intent="emit('intent', $event)"
-      />
-
-      <SettlePanel v-if="isHost && !settlement" :state="state" @intent="emit('intent', $event)" />
     </template>
 
     <p v-else-if="status.kind !== 'failed' && !notice" class="hint center">等待房間資料…</p>
 
-    <button type="button" class="text-link leave" @click="confirmLeave">{{ isHost ? '關閉房間' : '離開房間' }}</button>
-
-    <div v-if="showRoom && !settlement" class="dock">
-      <button type="button" class="ink block" :disabled="!connected" @click="sheet = { kind: 'add' }">
+    <div v-if="showRoom && !settlement" class="dock" :class="{ split: isHost }">
+      <button v-if="isHost" type="button" class="outline paper-fill" :disabled="!connected" @click="sheet = { kind: 'settle' }">
+        結算
+      </button>
+      <button type="button" class="ink" :disabled="!connected" @click="sheet = { kind: 'add' }">
         {{ connected ? '＋ 記一筆' : '連線恢復後才能記帳' }}
       </button>
     </div>
 
+    <!-- 底部表單 -->
     <InviteSheet
       v-if="sheet?.kind === 'invite'"
       :room-name="state?.name ?? roomCode"
       :room-code="roomCode"
       :join-url="joinUrl"
+      @close="sheet = null"
+    />
+
+    <BottomSheet v-if="sheet?.kind === 'menu'" label="MENU" @close="sheet = null">
+      <div class="menu">
+        <button v-if="isHost && state" type="button" class="menu-item" @click="openRename">修改房間名稱</button>
+        <button type="button" class="menu-item danger" @click="confirmLeave">{{ isHost ? '關閉房間' : '離開房間' }}</button>
+      </div>
+    </BottomSheet>
+
+    <BottomSheet v-if="state && sheet?.kind === 'members'" label="MEMBERS" @close="sheet = null">
+      <div class="expense-form">
+        <JoinRequests v-if="pendingRequests.length" :requests="pendingRequests" @intent="emit('intent', $event)" />
+        <MemberList
+          :state="state"
+          :client-id="clientId"
+          :is-host="isHost"
+          :connection-kinds="connectionKinds"
+          @intent="emit('intent', $event)"
+        />
+      </div>
+    </BottomSheet>
+
+    <BottomSheet v-if="state && sheet?.kind === 'balances'" label="BALANCE" @close="sheet = null">
+      <div class="expense-form">
+        <p class="hint">預覽以小數進位計算；實際結果以房主結算時的選擇為準</p>
+        <BalanceSummary :members="state.members" :balances="previewBalances" :client-id="clientId" />
+      </div>
+    </BottomSheet>
+
+    <SettleSheet
+      v-if="state && sheet?.kind === 'settle'"
+      :state="state"
+      @intent="emit('intent', $event)"
       @close="sheet = null"
     />
 
@@ -260,6 +318,17 @@ function reload() {
         </label>
         <button class="ink block" :disabled="!cleanRoomName(renameInput)">儲存</button>
       </form>
+    </BottomSheet>
+
+    <BottomSheet v-if="promptRequest" label="JOIN REQUEST" @close="dismissRequest(promptRequest.id)">
+      <div class="confirm">
+        <p class="confirm-title">{{ promptRequest.nickname }} 想重新加入房間</p>
+        <p class="hint">他之前被移出房間。同意後會重新加入，並參與所有帳目。</p>
+        <div class="button-pair">
+          <button type="button" class="outline" @click="resolveRequest(promptRequest.id, false)">拒絕</button>
+          <button type="button" class="ink" @click="resolveRequest(promptRequest.id, true)">同意</button>
+        </div>
+      </div>
     </BottomSheet>
   </section>
 </template>

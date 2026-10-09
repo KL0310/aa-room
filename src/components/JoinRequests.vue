@@ -11,9 +11,8 @@ function resolve(memberId: string, approve: boolean) {
 </script>
 
 <template>
-  <section class="paper alert">
-    <span class="mono-label">REJOIN REQUEST</span>
-    <p class="hint">以下成員曾被移出房間，同意後會重新加入並參與所有帳目</p>
+  <div class="join-requests">
+    <span class="mono-label">想重新加入</span>
     <ul class="requests">
       <li v-for="r in requests" :key="r.id">
         <strong class="name">{{ r.nickname }}</strong>
@@ -21,5 +20,5 @@ function resolve(memberId: string, approve: boolean) {
         <button type="button" class="ink small" @click="resolve(r.id, true)">同意</button>
       </li>
     </ul>
-  </section>
+  </div>
 </template>
