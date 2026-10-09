@@ -3,16 +3,25 @@ import { computeSettlement, unsettleableExpenses } from './settlement'
 import type { Expense, RoomState } from './types'
 
 export const NICKNAME_MAX_LENGTH = 20
+export const ROOM_NAME_MAX_LENGTH = 20
 export const TITLE_MAX_LENGTH = 30
 export const AMOUNT_MAX = 99_999_999
 
 // 以下皆為純函式：不修改傳入的 state，方便測試與比對是否有變更
 
-export function createRoom(code: string, hostId: string, hostNickname: string, now: number): RoomState {
+export function createRoom(
+  code: string,
+  hostId: string,
+  hostNickname: string,
+  now: number,
+  roomName = '',
+): RoomState {
+  const nickname = cleanNickname(hostNickname)
   return {
     code,
+    name: cleanRoomName(roomName) || defaultRoomName(nickname),
     hostId,
-    members: [{ id: hostId, nickname: cleanNickname(hostNickname), online: true, joinedAt: now }],
+    members: [{ id: hostId, nickname, online: true, joinedAt: now }],
     expenses: [],
     removed: [],
     joinRequests: [],
@@ -179,6 +188,14 @@ export function applyIntent(state: RoomState, actorId: string, intent: Intent, c
       if (!locked) return fail('invalid')
       return ok({ ...state, settlement: null })
     }
+
+    // 名稱不影響計算，結算後也可以改
+    case 'renameRoom': {
+      if (!isHost) return fail('forbidden')
+      const name = cleanRoomName(intent.name)
+      if (!name) return fail('invalid')
+      return ok({ ...state, name })
+    }
   }
 }
 
@@ -192,6 +209,15 @@ export function validateExpenseFields(title: string, amount: number): { title: s
 
 export function cleanNickname(nickname: string): string {
   return nickname.trim().slice(0, NICKNAME_MAX_LENGTH)
+}
+
+export function cleanRoomName(name: string): string {
+  return name.trim().slice(0, ROOM_NAME_MAX_LENGTH)
+}
+
+/** 房主沒有填名稱時的預設值 */
+export function defaultRoomName(hostNickname: string): string {
+  return cleanRoomName(`${hostNickname}的房間`)
 }
 
 function isMember(state: RoomState, id: string): boolean {

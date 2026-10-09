@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { confirmAction } from '../confirm'
 import type { Intent } from '../room/protocol'
 import type { RoomState } from '../room/types'
 import type { ConnectionKind } from '../transport/types'
@@ -24,39 +25,40 @@ function memberKind(memberId: string): ConnectionKind | null {
   return props.connectionKinds[memberId] ?? null
 }
 
-function hasPayments(memberId: string): boolean {
-  return props.state.expenses.some((e) => e.payerId === memberId)
-}
-
 function removeHint(memberId: string): string {
   if (props.state.settlement) return '已結算，無法移出'
-  if (hasPayments(memberId)) return '有付款紀錄，無法移出'
+  if (props.state.expenses.some((e) => e.payerId === memberId)) return '有付款紀錄，無法移出'
   return ''
 }
 
-function remove(memberId: string, nickname: string) {
-  if (confirm(`確定要將「${nickname}」移出房間？他之後需要你同意才能重新加入。`)) {
-    emit('intent', { kind: 'removeMember', memberId })
-  }
+async function remove(memberId: string, nickname: string) {
+  const ok = await confirmAction({
+    title: `將「${nickname}」移出房間？`,
+    message: '他之後需要你同意才能重新加入',
+    confirmText: '移出',
+    danger: true,
+  })
+  if (ok) emit('intent', { kind: 'removeMember', memberId })
 }
 </script>
 
 <template>
-  <div class="card">
-    <h2>成員 <span class="count">{{ state.members.length }}</span></h2>
+  <section class="paper">
+    <div class="section-head">
+      <span class="mono-label">MEMBERS</span>
+      <span class="mono-label">{{ state.members.filter((m) => m.online).length }}/{{ state.members.length }} ONLINE</span>
+    </div>
     <ul class="members">
       <li v-for="m in state.members" :key="m.id">
         <span class="presence" :class="{ online: m.online }" :title="m.online ? '在線' : '離線'" />
-        <span class="name">{{ m.nickname }}</span>
-        <span v-if="m.id === state.hostId" class="tag">房主</span>
-        <span v-if="m.id === clientId" class="tag me">我</span>
-        <span v-if="memberKind(m.id)" class="tag kind" :class="memberKind(m.id)!">
-          {{ kindLabel[memberKind(m.id)!] }}
-        </span>
+        <span class="name" :class="{ me: m.id === clientId }">{{ m.nickname }}</span>
+        <span v-if="m.id === state.hostId" class="badge">房主</span>
+        <span v-if="m.id === clientId" class="badge ink-badge">我</span>
+        <span v-if="memberKind(m.id)" class="badge mono">{{ kindLabel[memberKind(m.id)!] }}</span>
         <button
           v-if="isHost && m.id !== state.hostId"
           type="button"
-          class="link danger push-right"
+          class="text-link danger push-right"
           :disabled="!!removeHint(m.id)"
           :title="removeHint(m.id)"
           @click="remove(m.id, m.nickname)"
@@ -65,5 +67,5 @@ function remove(memberId: string, nickname: string) {
         </button>
       </li>
     </ul>
-  </div>
+  </section>
 </template>

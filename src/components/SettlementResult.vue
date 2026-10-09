@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { copyText } from '../clipboard'
+import { confirmAction } from '../confirm'
 import { formatAmount } from '../format'
 import type { Intent } from '../room/protocol'
-import type { RoomState, Settlement } from '../room/types'
+import type { RoomState, Settlement, Transfer } from '../room/types'
 import BalanceSummary from './BalanceSummary.vue'
 
 const props = defineProps<{
@@ -13,6 +15,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ intent: [intent: Intent] }>()
+
+const copiedKey = ref('')
 
 function nameOf(id: string): string {
   return props.state.members.find((m) => m.id === id)?.nickname ?? '（已離開）'
@@ -25,51 +29,71 @@ const myReceipts = computed(() => props.settlement.transfers.filter((t) => t.toI
 const lateJoiners = computed(() => props.state.members.filter((m) => !(m.id in props.settlement.balances)))
 const snapshotMembers = computed(() => props.state.members.filter((m) => m.id in props.settlement.balances))
 
-function reopen() {
-  if (confirm('退回後結算結果會作廢，大家可以繼續修改帳目。確定要退回？')) emit('intent', { kind: 'reopen' })
+async function copyAmount(t: Transfer) {
+  if (await copyText(String(t.amount))) {
+    copiedKey.value = t.toId
+    setTimeout(() => (copiedKey.value = ''), 1500)
+  }
+}
+
+async function reopen() {
+  const ok = await confirmAction({
+    title: '退回修改？',
+    message: '結算結果會作廢，大家可以繼續修改帳目，之後再重新結算。',
+    confirmText: '退回',
+  })
+  if (ok) emit('intent', { kind: 'reopen' })
 }
 </script>
 
 <template>
-  <div class="card settlement">
-    <h2>結算結果</h2>
-    <p class="hint">
+  <section class="paper settlement">
+    <div class="stamp" aria-hidden="true">已結算</div>
+    <span class="mono-label">SETTLEMENT</span>
+    <h2>結算單</h2>
+    <p class="mono meta">
       {{ settlement.mode === 'hub' ? `統一收付（由 ${nameOf(settlement.hubId ?? '')} 收付）` : '各自轉帳' }} ·
       除不盡時{{ settlement.rounding === 'ceil' ? '進位給代墊人' : '捨去' }}
     </p>
 
-    <div class="my-action" :class="{ pay: myPayments.length, receive: !myPayments.length && myReceipts.length }">
-      <template v-if="!included">你在結算後才加入，不需要付款</template>
-      <template v-else-if="myPayments.length">
-        <p v-for="t in myPayments" :key="t.toId">
-          你要付給 <strong>{{ nameOf(t.toId) }}</strong> <span class="big-amount">{{ formatAmount(t.amount) }}</span>
-        </p>
+    <div class="my-action">
+      <template v-if="!included">
+        <p>你在結算後才加入，不需要付款</p>
       </template>
-      <template v-if="included && myReceipts.length">
-        <p v-for="t in myReceipts" :key="t.fromId">
-          你會收到 <strong>{{ nameOf(t.fromId) }}</strong> 的 <span class="big-amount">{{ formatAmount(t.amount) }}</span>
-        </p>
+      <template v-else>
+        <div v-for="t in myPayments" :key="`pay-${t.toId}`" class="my-transfer">
+          <p>你要付給 <strong>{{ nameOf(t.toId) }}</strong></p>
+          <span class="mono hero-amount owe">{{ formatAmount(t.amount) }}</span>
+          <button type="button" class="ink small" @click="copyAmount(t)">
+            {{ copiedKey === t.toId ? '已複製' : '複製金額' }}
+          </button>
+        </div>
+        <div v-for="t in myReceipts" :key="`receive-${t.fromId}`" class="my-transfer">
+          <p>你會收到 <strong>{{ nameOf(t.fromId) }}</strong> 的</p>
+          <span class="mono hero-amount">{{ formatAmount(t.amount) }}</span>
+        </div>
+        <p v-if="!myPayments.length && !myReceipts.length">你不需要付款，也沒有款項要收</p>
       </template>
-      <template v-if="included && !myPayments.length && !myReceipts.length">你不需要付款，也沒有款項要收</template>
     </div>
 
-    <h3>所有轉帳</h3>
-    <ol v-if="settlement.transfers.length" class="transfers">
-      <li v-for="(t, i) in settlement.transfers" :key="i" :class="{ me: t.fromId === clientId || t.toId === clientId }">
-        <span>{{ nameOf(t.fromId) }}</span>
-        <span class="arrow">→</span>
-        <span>{{ nameOf(t.toId) }}</span>
-        <span class="push-right">{{ formatAmount(t.amount) }}</span>
+    <div class="rule" />
+    <span class="mono-label">TRANSFERS</span>
+    <ul v-if="settlement.transfers.length" class="transfers">
+      <li v-for="(t, i) in settlement.transfers" :key="i" class="leader-row" :class="{ me: t.fromId === clientId || t.toId === clientId }">
+        <span>{{ nameOf(t.fromId) }} → {{ nameOf(t.toId) }}</span>
+        <span class="leader" />
+        <span class="mono">{{ formatAmount(t.amount) }}</span>
       </li>
-    </ol>
+    </ul>
     <p v-else class="hint">大家剛好打平，不需要轉帳</p>
 
-    <h3>各自收支</h3>
+    <div class="rule" />
     <BalanceSummary :members="snapshotMembers" :balances="settlement.balances" :client-id="clientId" />
     <p v-if="lateJoiners.length" class="hint">
       {{ lateJoiners.map((m) => m.nickname).join('、') }} 在結算後加入，未計入本次結算
     </p>
 
-    <button v-if="isHost" type="button" class="ghost" @click="reopen">退回修改</button>
-  </div>
+    <p class="mono receipt-end">* * * THANK YOU * * *</p>
+    <button v-if="isHost" type="button" class="outline block" @click="reopen">退回修改</button>
+  </section>
 </template>

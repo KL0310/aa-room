@@ -1,7 +1,7 @@
 import type { RoundingMode, RoomState, SettlementMode } from './types'
 
 /** 協定有不相容的變更時遞增；GitHub Pages 有快取，成員可能還在用舊版頁面 */
-export const PROTOCOL_VERSION = 2
+export const PROTOCOL_VERSION = 3
 
 /** 成員可以送出的操作；是否允許由房主依權限判斷 */
 export type Intent =
@@ -13,6 +13,7 @@ export type Intent =
   | { kind: 'resolveJoinRequest'; memberId: string; approve: boolean }
   | { kind: 'settle'; mode: SettlementMode; rounding: RoundingMode }
   | { kind: 'reopen' }
+  | { kind: 'renameRoom'; name: string }
 
 /** client → 房主：只送出意圖，由房主驗證後更新 state */
 export type ClientMessage =
@@ -82,6 +83,8 @@ export function isIntent(value: unknown): value is Intent {
       return (v.mode === 'direct' || v.mode === 'hub') && (v.rounding === 'ceil' || v.rounding === 'floor')
     case 'reopen':
       return true
+    case 'renameRoom':
+      return typeof v.name === 'string'
     default:
       return false
   }

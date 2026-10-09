@@ -18,10 +18,7 @@ const props = defineProps<{
   initial?: Expense
 }>()
 
-const emit = defineEmits<{
-  submit: [draft: ExpenseDraft]
-  cancel: []
-}>()
+const emit = defineEmits<{ submit: [draft: ExpenseDraft] }>()
 
 const title = ref(props.initial?.title ?? '')
 const amountInput = ref(props.initial ? String(props.initial.amount) : '')
@@ -37,41 +34,31 @@ function submit() {
   // 只有房主能指定付款人；一般成員由房主端預設為本人
   if (props.isHost) draft.payerId = payerId.value
   emit('submit', draft)
-  if (!props.initial) {
-    title.value = ''
-    amountInput.value = ''
-    payerId.value = props.clientId
-  }
 }
 </script>
 
 <template>
   <form class="expense-form" @submit.prevent="submit">
-    <div class="form-row">
-      <input v-model="title" :maxlength="TITLE_MAX_LENGTH" placeholder="項目，例如：晚餐" aria-label="項目名稱" />
-      <input
-        v-model="amountInput"
-        class="amount-input"
-        inputmode="numeric"
-        placeholder="金額"
-        aria-label="金額"
-        autocomplete="off"
-      />
-    </div>
+    <label class="field">
+      <span class="field-label">項目</span>
+      <input v-model="title" :maxlength="TITLE_MAX_LENGTH" placeholder="例如：晚餐" />
+    </label>
+    <label class="field">
+      <span class="field-label">金額</span>
+      <input v-model="amountInput" class="mono amount-input" inputmode="numeric" placeholder="0" autocomplete="off" />
+    </label>
     <p v-if="amountError" class="error">金額請輸入正整數</p>
-    <label v-if="isHost" class="payer-select">
-      <span>付款人</span>
+    <label v-if="isHost" class="field">
+      <span class="field-label">付款人</span>
       <select v-model="payerId">
         <option v-for="m in members" :key="m.id" :value="m.id">
           {{ m.nickname }}{{ m.id === clientId ? '（我）' : '' }}
         </option>
       </select>
     </label>
-    <div class="form-actions">
-      <button v-if="initial" type="button" class="ghost" @click="emit('cancel')">取消</button>
-      <button class="primary" :disabled="!valid">
-        {{ initial ? '儲存' : amount ? `新增 ${formatAmount(amount)}` : '新增' }}
-      </button>
-    </div>
+    <p v-else class="hint">付款人：你自己</p>
+    <button class="ink block" :disabled="!valid">
+      {{ initial ? '儲存' : amount ? `記下 ${formatAmount(amount)}` : '記下' }}
+    </button>
   </form>
 </template>

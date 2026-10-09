@@ -51,11 +51,11 @@ export function useRoomSession() {
 
   const joinUrl = computed(() => (roomCode.value ? buildJoinUrl(roomCode.value) : ''))
 
-  function createRoom(nickname: string): void {
+  function createRoom(nickname: string, roomName = ''): void {
     const code = generateRoomCode()
     saveNickname(nickname)
     saveSession({ code, role: 'host', nickname })
-    startHost(code, createRoomState(code, clientId, nickname, Date.now()), false)
+    startHost(code, createRoomState(code, clientId, nickname, Date.now(), roomName), false)
   }
 
   function joinRoom(code: string, nickname: string): void {
@@ -104,7 +104,7 @@ export function useRoomSession() {
       // 新房間的房號剛好被別人使用（機率極低），換一個房號重開
       if (s.kind === 'failed' && s.reason === 'room-code-taken' && !isRestore) {
         const nickname = initial.members[0]?.nickname ?? ''
-        queueMicrotask(() => createRoom(nickname))
+        queueMicrotask(() => createRoom(nickname, initial.name))
       }
     })
     membership.value = 'member'

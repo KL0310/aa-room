@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ConfirmDialog from './components/ConfirmDialog.vue'
 import HomeView from './components/HomeView.vue'
 import RoomView from './components/RoomView.vue'
 import { loadNickname } from './storage'
@@ -32,5 +33,6 @@ session.resume()
       @create="session.createRoom"
       @join="session.joinRoom"
     />
+    <ConfirmDialog />
   </main>
 </template>

@@ -64,6 +64,8 @@ export interface JoinRequest {
 
 export interface RoomState {
   code: string
+  /** 房主自訂的房間名稱 */
+  name: string
   hostId: string
   members: Member[]
   expenses: Expense[]

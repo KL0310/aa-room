@@ -39,6 +39,12 @@ function removeB(state = room()): RoomState {
 }
 
 describe('createRoom', () => {
+  it('沒有填名稱時預設為「暱稱的房間」，有填則截斷到 20 字', () => {
+    expect(base().name).toBe('房主的房間')
+    expect(createRoom('ABCDEF', 'host', '房主', 0, '  大阪四天三夜 ').name).toBe('大阪四天三夜')
+    expect(createRoom('ABCDEF', 'host', '房主', 0, '字'.repeat(30)).name).toHaveLength(20)
+  })
+
   it('房主是第一位成員且在線，尚未結算', () => {
     const state = base()
     expect(state.members).toEqual([{ id: 'host', nickname: '房主', online: true, joinedAt: 0 }])
@@ -303,5 +309,19 @@ describe('applyIntent：結算與退回', () => {
   it('每次成功的操作都會遞增 version', () => {
     const state = room()
     expect(expectOk(apply(state, 'a', { kind: 'addExpense', title: 'x', amount: 1 })).version).toBe(state.version + 1)
+  })
+})
+
+describe('applyIntent：房間名稱', () => {
+  it('只有房主可以改名，空白名稱拒絕', () => {
+    expect(apply(room(), 'a', { kind: 'renameRoom', name: '墾丁' })).toEqual({ ok: false, error: 'forbidden' })
+    expect(apply(room(), 'host', { kind: 'renameRoom', name: '  ' })).toEqual({ ok: false, error: 'invalid' })
+    expect(expectOk(apply(room(), 'host', { kind: 'renameRoom', name: ' 墾丁 ' })).name).toBe('墾丁')
+  })
+
+  it('結算後仍可改名', () => {
+    const [state] = withExpense()
+    const settled = expectOk(apply(state, 'host', { kind: 'settle', mode: 'direct', rounding: 'ceil' }))
+    expect(expectOk(apply(settled, 'host', { kind: 'renameRoom', name: '墾丁' })).name).toBe('墾丁')
   })
 })
