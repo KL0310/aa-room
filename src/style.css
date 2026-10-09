@@ -117,7 +117,17 @@ button.icon-button { min-height: 44px; width: 44px; padding: 0; display: flex; a
 .code-big { font-size: 34px; font-weight: 700; letter-spacing: 0.2em; }
 
 /* 房間頁首 */
-.room.has-dock { padding-bottom: 88px; }
+/* 記帳中：整頁固定為一個螢幕高，只有帳目清單捲動；收支摘要與合計固定在收據上下 */
+.room.fill {
+  --dock-height: calc(76px + env(safe-area-inset-bottom));
+  height: calc(100dvh - 20px - var(--dock-height));
+  display: flex;
+  flex-direction: column;
+}
+.app:has(.room.fill) { padding-bottom: 0; }
+.room.fill > .paper.ledger { flex: 0 1 auto; min-height: 0; margin-bottom: 12px; }
+.ledger .line-items { flex: 0 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ledger .balance-head, .ledger .total-row { flex: none; }
 .room-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 14px; }
 .header-actions { display: flex; align-items: center; gap: 4px; flex: none; }
 .presence-button { align-self: flex-start; min-height: 28px; padding: 0; border: none; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }

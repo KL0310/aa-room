@@ -164,7 +164,7 @@ function reload() {
 </script>
 
 <template>
-  <section class="room" :class="{ 'has-dock': showRoom && !settlement }">
+  <section class="room" :class="{ fill: showRoom && !settlement }">
     <header class="room-header">
       <div class="title-block">
         <h1 class="room-name">{{ state?.name ?? '連線中…' }}</h1>
@@ -210,7 +210,7 @@ function reload() {
         @show-items="openItems"
       />
 
-      <section v-if="!settlement" class="paper">
+      <section v-if="!settlement" class="paper ledger">
         <button
           v-if="!settlement && myBalance && state.expenses.length"
           type="button"
