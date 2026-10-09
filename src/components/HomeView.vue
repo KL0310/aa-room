@@ -44,8 +44,7 @@ function join() {
       </button>
     </div>
     <header class="brand">
-      <AppLogo :size="72" />
-      <h1 class="mono">AA ROOM</h1>
+      <h1><AppLogo :size="60" horizontal /></h1>
       <p>聚會分帳，開個房間就好</p>
     </header>
 
