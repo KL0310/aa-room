@@ -1,10 +1,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { NOTE_MAX_LENGTH } from '../room/roomState'
+import { formatAmount } from '../format'
+import type { Membership } from '../room/clientRoom'
+import type { Intent } from '../room/protocol'
+import { computeBalances } from '../room/settlement'
 import type { RoomState } from '../room/types'
 import type { ConnectionKind, TransportStatus } from '../transport/types'
 import type { RoomNotice, Role } from '../useRoomSession'
+import BalanceSummary from './BalanceSummary.vue'
+import ExpenseForm, { type ExpenseDraft } from './ExpenseForm.vue'
+import ExpenseItem from './ExpenseItem.vue'
+import JoinRequests from './JoinRequests.vue'
+import MemberList from './MemberList.vue'
+import MembershipNotice from './MembershipNotice.vue'
 import QrCode from './QrCode.vue'
+import SettlementResult from './SettlementResult.vue'
+import SettlePanel from './SettlePanel.vue'
 
 const props = defineProps<{
   role: Role
@@ -12,21 +23,29 @@ const props = defineProps<{
   state: RoomState | null
   status: TransportStatus
   notice: RoomNotice | null
+  membership: Membership
   clientId: string
   connectionKinds: Record<string, ConnectionKind>
   joinUrl: string
 }>()
 
 const emit = defineEmits<{
-  addNote: [text: string]
+  intent: [intent: Intent]
+  requestRejoin: []
   leave: []
 }>()
 
-const noteText = ref('')
 const copied = ref(false)
 const showShare = ref(props.role === 'host')
 
 const isHost = computed(() => props.role === 'host')
+const connected = computed(() => props.status.kind === 'ready')
+const settlement = computed(() => props.state?.settlement ?? null)
+const total = computed(() => props.state?.expenses.reduce((sum, e) => sum + e.amount, 0) ?? 0)
+/** 結算前的即時預覽，以進位計算；實際結果依房主結算時的選擇 */
+const previewBalances = computed(() =>
+  props.state ? computeBalances(props.state.members, props.state.expenses, 'ceil') : {},
+)
 
 const statusText = computed(() => {
   const s = props.status
@@ -56,6 +75,8 @@ const noticeText = computed(() => {
       return '這個房間已經在此瀏覽器的其他分頁開啟，請回到該分頁操作'
     case 'same-device-as-host':
       return '這個瀏覽器就是房主，請改用其他裝置或無痕視窗加入'
+    case 'version-mismatch':
+      return '你和房主使用的版本不同，請兩邊都重新整理頁面'
     case 'invalid-message':
       return '房主無法處理這個請求'
     default:
@@ -63,28 +84,8 @@ const noticeText = computed(() => {
   }
 })
 
-const memberName = computed(() => {
-  const names = new Map(props.state?.members.map((m) => [m.id, m.nickname]))
-  return (id: string) => names.get(id) ?? '（未知）'
-})
-
-const kindLabel: Record<ConnectionKind, string> = {
-  direct: '直連',
-  relay: '中繼',
-  unknown: '偵測中',
-}
-
-/** 房主看每位成員的連線；成員只看自己到房主的連線，所以標在房主那一列 */
-function memberKind(memberId: string): ConnectionKind | null {
-  if (memberId === props.clientId) return null
-  return props.connectionKinds[memberId] ?? null
-}
-
-function submitNote() {
-  const text = noteText.value.trim()
-  if (!text || props.status.kind !== 'ready') return
-  emit('addNote', text)
-  noteText.value = ''
+function addExpense(draft: ExpenseDraft) {
+  emit('intent', { kind: 'addExpense', ...draft })
 }
 
 async function copyLink() {
@@ -101,6 +102,10 @@ function confirmLeave() {
   const message = isHost.value ? '關閉房間後，其他人將無法再同步。確定要離開？' : '確定要離開房間？'
   if (confirm(message)) emit('leave')
 }
+
+function reload() {
+  location.reload()
+}
 </script>
 
 <template>
@@ -116,10 +121,11 @@ function confirmLeave() {
       </div>
     </header>
 
-    <p class="status" :class="status.kind" role="status">
-      <span class="dot" />{{ statusText }}
+    <p class="status" :class="status.kind" role="status"><span class="dot" />{{ statusText }}</p>
+    <p v-if="noticeText" class="error">
+      {{ noticeText }}
+      <button v-if="notice === 'version-mismatch'" class="link" @click="reload">重新整理</button>
     </p>
-    <p v-if="noticeText" class="error">{{ noticeText }}</p>
 
     <div v-if="showShare" class="card share">
       <QrCode :text="joinUrl" />
@@ -130,37 +136,73 @@ function confirmLeave() {
       </div>
     </div>
 
-    <template v-if="state">
-      <div class="card">
-        <h2>成員 <span class="count">{{ state.members.length }}</span></h2>
-        <ul class="members">
-          <li v-for="m in state.members" :key="m.id">
-            <span class="presence" :class="{ online: m.online }" :title="m.online ? '在線' : '離線'" />
-            <span class="name">{{ m.nickname }}</span>
-            <span v-if="m.id === state.hostId" class="tag">房主</span>
-            <span v-if="m.id === clientId" class="tag me">我</span>
-            <span v-if="memberKind(m.id)" class="tag kind" :class="memberKind(m.id)!">
-              {{ kindLabel[memberKind(m.id)!] }}
-            </span>
-          </li>
-        </ul>
+    <MembershipNotice
+      v-if="!isHost && (membership === 'removed' || membership === 'pending' || membership === 'rejected')"
+      :membership="membership"
+      @request-rejoin="emit('requestRejoin')"
+      @leave="confirmLeave"
+    />
+
+    <template v-else-if="state">
+      <JoinRequests
+        v-if="isHost && state.joinRequests.length"
+        :requests="state.joinRequests"
+        @intent="emit('intent', $event)"
+      />
+
+      <SettlementResult
+        v-if="settlement"
+        :state="state"
+        :settlement="settlement"
+        :client-id="clientId"
+        :is-host="isHost"
+        @intent="emit('intent', $event)"
+      />
+
+      <div v-else class="card">
+        <h2>新增帳目</h2>
+        <ExpenseForm :members="state.members" :client-id="clientId" :is-host="isHost" @submit="addExpense" />
+        <p v-if="!connected" class="hint">連線恢復後才能送出</p>
       </div>
 
       <div class="card">
-        <h2>同步測試</h2>
-        <p class="hint">任何人新增的項目都會即時出現在所有人的畫面上</p>
-        <ul v-if="state.notes.length" class="notes">
-          <li v-for="n in state.notes" :key="n.id">
-            <span class="author">{{ memberName(n.authorId) }}</span>
-            <span>{{ n.text }}</span>
-          </li>
+        <h2>
+          帳目 <span class="count">{{ state.expenses.length }}</span>
+          <span v-if="state.expenses.length" class="count push-right">合計 {{ formatAmount(total) }}</span>
+        </h2>
+        <p v-if="!state.expenses.length" class="hint">還沒有帳目。誰先付了錢，就由誰新增一筆。</p>
+        <p v-else-if="!settlement" class="hint">點名字可以切換是否參與；你可以切換自己的{{ isHost ? '，房主可以切換所有人的' : '' }}</p>
+        <ul class="expenses">
+          <ExpenseItem
+            v-for="e in state.expenses"
+            :key="e.id"
+            :expense="e"
+            :members="state.members"
+            :client-id="clientId"
+            :is-host="isHost"
+            :locked="!!settlement || !connected"
+            @intent="emit('intent', $event)"
+          />
         </ul>
-        <form class="note-form" @submit.prevent="submitNote">
-          <input v-model="noteText" :maxlength="NOTE_MAX_LENGTH" placeholder="輸入文字" />
-          <button :disabled="!noteText.trim() || status.kind !== 'ready'">新增</button>
-        </form>
       </div>
+
+      <div v-if="!settlement && state.expenses.length" class="card">
+        <h2>目前收支</h2>
+        <p class="hint">預覽，以小數進位計算；實際結果以房主結算時的選擇為準</p>
+        <BalanceSummary :members="state.members" :balances="previewBalances" :client-id="clientId" />
+      </div>
+
+      <MemberList
+        :state="state"
+        :client-id="clientId"
+        :is-host="isHost"
+        :connection-kinds="connectionKinds"
+        @intent="emit('intent', $event)"
+      />
+
+      <SettlePanel v-if="isHost && !settlement" :state="state" @intent="emit('intent', $event)" />
     </template>
+
     <p v-else-if="status.kind !== 'failed' && !notice" class="hint center">等待房間資料…</p>
   </section>
 </template>

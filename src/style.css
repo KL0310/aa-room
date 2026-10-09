@@ -9,6 +9,9 @@
   --warn: #b7791f;
   --danger: #c0392b;
   --relay: #8a5cc2;
+  --positive: #1f7a5c;
+  --negative: #c0392b;
+  --highlight: #eef6f1;
   --radius: 14px;
   color-scheme: light;
   font-family: system-ui, -apple-system, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
@@ -27,6 +30,9 @@
     --accent: #3fb68b;
     --accent-text: #0d1f18;
     --relay: #b392e0;
+    --positive: #3fb68b;
+    --negative: #e8746a;
+    --highlight: #1d2b25;
     color-scheme: dark;
   }
 }
@@ -41,7 +47,8 @@ body { margin: 0; background: var(--bg); }
 }
 
 h1, h2, p { margin: 0; }
-h2 { font-size: 1rem; margin-bottom: 10px; }
+h2 { font-size: 1rem; margin-bottom: 4px; display: flex; align-items: baseline; gap: 6px; }
+h3 { font-size: 0.9rem; margin: 6px 0 0; color: var(--muted); }
 
 .brand { text-align: center; margin: 24px 0 28px; }
 .brand h1 { font-size: 2.2rem; letter-spacing: -0.02em; }
@@ -60,7 +67,7 @@ h2 { font-size: 1rem; margin-bottom: 10px; }
 
 .field { display: flex; flex-direction: column; gap: 6px; font-size: 0.9rem; color: var(--muted); }
 
-input {
+input, select {
   font: inherit;
   font-size: 1rem;
   color: var(--text);
@@ -71,7 +78,7 @@ input {
   width: 100%;
   min-width: 0;
 }
-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
 .code-input { text-transform: uppercase; letter-spacing: 0.3em; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .code { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 0.15em; }
@@ -135,3 +142,71 @@ button.link { border: none; padding: 4px; font-weight: 400; color: var(--muted);
 .author { color: var(--muted); flex: none; }
 .note-form { display: flex; gap: 8px; }
 .note-form button { flex: none; }
+
+.push-right { margin-left: auto; }
+button.link.danger { color: var(--danger); }
+button.link:disabled { text-decoration: none; }
+
+/* 帳目表單 */
+.expense-form { display: flex; flex-direction: column; gap: 8px; }
+.form-row { display: flex; gap: 8px; }
+.amount-input { flex: 0 0 34%; text-align: right; font-variant-numeric: tabular-nums; }
+.payer-select { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
+.payer-select select { flex: 1; }
+.form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.form-actions .primary { flex: 1; }
+
+/* 帳目列表 */
+.expenses { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.expense { border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.expense.warn { border-color: var(--danger); }
+.expense-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.expense-title { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+.expense-amount { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+}
+.chip.on { border-style: solid; border-color: var(--accent); color: var(--accent); background: var(--highlight); }
+.chip.me { font-weight: 700; }
+.chip:disabled { opacity: 0.75; cursor: default; }
+.expense-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+/* 收支表 */
+.balances { width: 100%; border-collapse: collapse; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.balances th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-align: right; padding: 4px 0; }
+.balances th:first-child, .balances td:first-child { text-align: left; }
+.balances td { text-align: right; padding: 6px 0; border-top: 1px solid var(--border); }
+.balances td.name { max-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.balances tr.me td { font-weight: 700; }
+.positive { color: var(--positive); }
+.negative { color: var(--negative); }
+
+/* 結算 */
+fieldset { border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+legend { font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+.option { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.option input { width: auto; margin-top: 4px; accent-color: var(--accent); }
+.option span { display: flex; flex-direction: column; }
+.option small { color: var(--muted); }
+.option:has(input:checked) { border-color: var(--accent); background: var(--highlight); }
+
+.my-action { border-radius: 12px; padding: 14px; background: var(--bg); text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.my-action.pay { background: color-mix(in srgb, var(--negative) 12%, transparent); }
+.my-action.receive { background: var(--highlight); }
+.big-amount { font-size: 1.4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.transfers { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.transfers li { display: flex; gap: 8px; padding: 8px 10px; background: var(--bg); border-radius: 8px; font-variant-numeric: tabular-nums; }
+.transfers li.me { outline: 2px solid var(--accent); }
+.arrow { color: var(--muted); }
+
+/* 剔除與加入申請 */
+.attention { border-color: var(--warn); }
+.requests { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.requests li { display: flex; align-items: center; gap: 8px; }
+.notice-card { text-align: center; align-items: center; }

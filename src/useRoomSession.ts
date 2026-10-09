@@ -1,7 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
-import { ClientRoom } from './room/clientRoom'
+import { ClientRoom, type Membership } from './room/clientRoom'
 import { HostRoom } from './room/hostRoom'
-import type { ClientMessage, HostErrorReason, HostMessage } from './room/protocol'
+import type { ClientMessage, HostErrorReason, HostMessage, Intent } from './room/protocol'
 import { generateRoomCode, normalizeRoomCode } from './room/roomCode'
 import { createRoom as createRoomState } from './room/roomState'
 import type { RoomState } from './room/types'
@@ -36,6 +36,8 @@ export function useRoomSession() {
   const state = shallowRef<RoomState | null>(null)
   const status = shallowRef<TransportStatus>({ kind: 'closed' })
   const notice = ref<RoomNotice | null>(null)
+  /** 房主固定為 member；成員端會依房主的回覆變化 */
+  const membership = ref<Membership>('joining')
   /** 成員 id → 連線類型。房主看得到每位成員；成員只看得到自己與房主之間的連線 */
   const connectionKinds = ref<Record<string, ConnectionKind>>({})
 
@@ -53,7 +55,7 @@ export function useRoomSession() {
     const code = generateRoomCode()
     saveNickname(nickname)
     saveSession({ code, role: 'host', nickname })
-    startHost(code, createRoomState(code, clientId, nickname), false)
+    startHost(code, createRoomState(code, clientId, nickname, Date.now()), false)
   }
 
   function joinRoom(code: string, nickname: string): void {
@@ -84,9 +86,13 @@ export function useRoomSession() {
     writeRoomToUrl(null)
   }
 
-  function addNote(text: string): void {
-    if (hostRoom) hostRoom.addNote(text)
-    else clientRoom?.addNote(text)
+  function dispatch(intent: Intent): void {
+    if (hostRoom) hostRoom.dispatch(intent)
+    else clientRoom?.dispatch(intent)
+  }
+
+  function requestRejoin(): void {
+    clientRoom?.requestRejoin()
   }
 
   async function startHost(code: string, initial: RoomState, isRestore: boolean): Promise<void> {
@@ -101,6 +107,7 @@ export function useRoomSession() {
         queueMicrotask(() => createRoom(nickname))
       }
     })
+    membership.value = 'member'
     hostRoom = new HostRoom(t, initial, (next) => {
       state.value = next
       saveHostState(next)
@@ -116,9 +123,14 @@ export function useRoomSession() {
     t.onStatusChange((s) => (status.value = s))
     clientRoom = new ClientRoom(t, clientId, nickname, {
       onState: (next) => (state.value = next),
+      onMembership: (next) => {
+        membership.value = next
+        if (next !== 'member') state.value = null
+      },
       onError: (reason) => {
         notice.value = reason
-        if (reason === 'same-device-as-host') t.close()
+        // 這兩種情況重連也不會改善，停止連線
+        if (reason === 'same-device-as-host' || reason === 'version-mismatch') t.close()
       },
     })
     t.start()
@@ -182,6 +194,7 @@ export function useRoomSession() {
     state.value = null
     status.value = { kind: 'closed' }
     notice.value = null
+    membership.value = 'joining'
     connectionKinds.value = {}
   }
 
@@ -192,13 +205,15 @@ export function useRoomSession() {
     state,
     status,
     notice,
+    membership,
     connectionKinds,
     joinUrl,
     createRoom,
     joinRoom,
     resume,
     leave,
-    addNote,
+    dispatch,
+    requestRejoin,
   }
 }
 

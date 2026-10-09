@@ -43,7 +43,10 @@ export function clearSession(): void {
 }
 
 export function loadHostState(code: string): RoomState | null {
-  return parse<RoomState>(read(HOST_STATE_PREFIX + code))
+  const state = parse<RoomState>(read(HOST_STATE_PREFIX + code))
+  // 舊版（PoC）保存的資料格式不同，不沿用
+  if (!state || !Array.isArray(state.expenses) || !Array.isArray(state.removed)) return null
+  return state
 }
 
 export function saveHostState(state: RoomState): void {

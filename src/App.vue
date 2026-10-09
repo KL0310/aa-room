@@ -17,10 +17,12 @@ session.resume()
       :state="session.state.value"
       :status="session.status.value"
       :notice="session.notice.value"
+      :membership="session.membership.value"
       :client-id="session.clientId"
       :connection-kinds="session.connectionKinds.value"
       :join-url="session.joinUrl.value"
-      @add-note="session.addNote"
+      @intent="session.dispatch"
+      @request-rejoin="session.requestRejoin"
       @leave="session.leave"
     />
     <HomeView
