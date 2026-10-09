@@ -281,3 +281,4 @@ button.room-name svg { flex: none; color: var(--faint); }
 .menu-item:last-child { border-bottom: none; }
 .menu-item.danger { color: var(--owe); }
 .join-requests { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1.5px dashed var(--ink); }
+.detail-link { align-self: flex-end; min-height: 32px; padding: 0; border: none; font-size: 0.85rem; color: var(--muted); }

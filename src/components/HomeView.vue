@@ -53,7 +53,6 @@ function join() {
         <input
           v-model="nickname"
           :maxlength="NICKNAME_MAX_LENGTH"
-          placeholder="例如：小明"
           autocomplete="nickname"
           @keyup.enter="invited ? join() : create()"
         />

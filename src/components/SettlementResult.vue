@@ -6,6 +6,7 @@ import { formatAmount } from '../format'
 import type { Intent } from '../room/protocol'
 import type { RoomState, Settlement, Transfer } from '../room/types'
 import BalanceSummary from './BalanceSummary.vue'
+import BottomSheet from './BottomSheet.vue'
 
 const props = defineProps<{
   state: RoomState
@@ -17,6 +18,7 @@ const props = defineProps<{
 const emit = defineEmits<{ intent: [intent: Intent] }>()
 
 const copiedKey = ref('')
+const showDetail = ref(false)
 
 function nameOf(id: string): string {
   return props.state.members.find((m) => m.id === id)?.nickname ?? '（已離開）'
@@ -87,11 +89,16 @@ async function reopen() {
     </ul>
     <p v-else class="hint">大家剛好打平，不需要轉帳</p>
 
-    <div class="rule" />
-    <BalanceSummary :members="snapshotMembers" :balances="settlement.balances" :client-id="clientId" />
-    <p v-if="lateJoiners.length" class="hint">
-      {{ lateJoiners.map((m) => m.nickname).join('、') }} 在結算後加入，未計入本次結算
-    </p>
+    <button type="button" class="detail-link" @click="showDetail = true">查看明細 ›</button>
+
+    <BottomSheet v-if="showDetail" label="DETAIL" @close="showDetail = false">
+      <div class="expense-form">
+        <BalanceSummary :members="snapshotMembers" :balances="settlement.balances" :client-id="clientId" />
+        <p v-if="lateJoiners.length" class="hint">
+          {{ lateJoiners.map((m) => m.nickname).join('、') }} 在結算後加入，未計入本次結算
+        </p>
+      </div>
+    </BottomSheet>
 
     <p class="mono receipt-end">* * * THANK YOU * * *</p>
     <button v-if="isHost" type="button" class="outline block" @click="reopen">退回修改</button>
