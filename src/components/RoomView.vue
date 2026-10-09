@@ -48,14 +48,14 @@ type Sheet =
   | { kind: 'balances' }
   | { kind: 'settle' }
   | { kind: 'menu' }
+  /** 結算後的帳目清單，以底部表單檢視 */
+  | { kind: 'items' }
 const sheet = ref<Sheet | null>(null)
 const renameInput = ref('')
 /** 同一時間只展開一筆帳目 */
 const expandedId = ref<string | null>(null)
 /** 房主關掉過的加入申請彈窗，不再自動彈出（仍可在成員列表處理） */
 const dismissedRequests = ref(new Set<string>())
-/** 結算後帳目清單預設收起，避免結算單下方還要捲很長 */
-const showSettledItems = ref(false)
 
 const isHost = computed(() => props.role === 'host')
 const connected = computed(() => props.status.kind === 'ready')
@@ -113,6 +113,11 @@ const noticeText = computed(() => {
 
 function toggleExpense(id: string) {
   expandedId.value = expandedId.value === id ? null : id
+}
+
+function openItems() {
+  expandedId.value = null
+  sheet.value = { kind: 'items' }
 }
 
 function submitExpense(draft: ExpenseDraft) {
@@ -202,19 +207,10 @@ function reload() {
         :client-id="clientId"
         :is-host="isHost"
         @intent="emit('intent', $event)"
+        @show-items="openItems"
       />
 
-      <button
-        v-if="settlement && state.expenses.length"
-        type="button"
-        class="outline block items-toggle"
-        :aria-expanded="showSettledItems"
-        @click="showSettledItems = !showSettledItems"
-      >
-        {{ showSettledItems ? '收起帳目' : `查看帳目（${state.expenses.length} 筆）` }}
-      </button>
-
-      <section v-if="!settlement || showSettledItems" class="paper">
+      <section v-if="!settlement" class="paper">
         <button
           v-if="!settlement && myBalance && state.expenses.length"
           type="button"
@@ -289,6 +285,26 @@ function reload() {
           :connection-kinds="connectionKinds"
           @intent="emit('intent', $event)"
         />
+      </div>
+    </BottomSheet>
+
+    <BottomSheet v-if="state && sheet?.kind === 'items'" label="ITEMS" @close="sheet = null">
+      <ul class="line-items">
+        <ExpenseItem
+          v-for="e in state.expenses"
+          :key="e.id"
+          :expense="e"
+          :members="state.members"
+          :client-id="clientId"
+          :is-host="isHost"
+          :locked="true"
+          :expanded="expandedId === e.id"
+          @toggle="toggleExpense(e.id)"
+        />
+      </ul>
+      <div class="total-row mono">
+        <span>TOTAL</span>
+        <span>{{ formatAmount(total) }}</span>
       </div>
     </BottomSheet>
 

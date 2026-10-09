@@ -283,5 +283,7 @@ button.room-name svg { flex: none; color: var(--faint); }
 .menu-item:last-child { border-bottom: none; }
 .menu-item.danger { color: var(--owe); }
 .join-requests { display: flex; flex-direction: column; gap: 8px; padding-bottom: 14px; border-bottom: 1.5px dashed var(--ink); }
-.detail-link { align-self: flex-end; min-height: 32px; padding: 0; border: none; font-size: 0.85rem; color: var(--muted); }
-.items-toggle { margin-bottom: 14px; background: var(--paper); }
+.detail-links { display: flex; justify-content: space-between; gap: 12px; }
+.detail-link { min-height: 32px; padding: 0; border: none; font-size: 0.85rem; color: var(--muted); }
+.detail-link:only-child { margin-left: auto; }
+.sheet .total-row { margin-top: 12px; }

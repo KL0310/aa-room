@@ -15,7 +15,7 @@ const props = defineProps<{
   isHost: boolean
 }>()
 
-const emit = defineEmits<{ intent: [intent: Intent] }>()
+const emit = defineEmits<{ intent: [intent: Intent]; showItems: [] }>()
 
 const copiedKey = ref('')
 const showDetail = ref(false)
@@ -89,7 +89,12 @@ async function reopen() {
     </ul>
     <p v-else class="hint">大家剛好打平，不需要轉帳</p>
 
-    <button type="button" class="detail-link" @click="showDetail = true">查看明細 ›</button>
+    <div class="detail-links">
+      <button v-if="state.expenses.length" type="button" class="detail-link" @click="emit('showItems')">
+        查看帳目（{{ state.expenses.length }} 筆）›
+      </button>
+      <button type="button" class="detail-link" @click="showDetail = true">查看明細 ›</button>
+    </div>
 
     <BottomSheet v-if="showDetail" label="DETAIL" @close="showDetail = false">
       <div class="expense-form">
