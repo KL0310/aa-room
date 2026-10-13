@@ -23,7 +23,7 @@ export interface Expense {
 /** direct：欠款人各自轉給應收款的人；hub：由付款總額最多的人統一收付 */
 export type SettlementMode = 'direct' | 'hub'
 
-/** 每筆帳目每人的分攤額除不盡時，ceil 無條件進位（代墊人多收），floor 無條件捨去（代墊人吸收） */
+/** 每人應付總額除不盡時，ceil 無條件進位（代墊人多收），floor 無條件捨去（代墊人吸收） */
 export type RoundingMode = 'ceil' | 'floor'
 
 export interface Transfer {

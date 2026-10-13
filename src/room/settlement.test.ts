@@ -6,7 +6,6 @@ import {
   hubTransfers,
   participantsOf,
   pickHub,
-  shareOf,
   unsettleableExpenses,
 } from './settlement'
 import { expense, member } from './testUtils'
@@ -22,20 +21,6 @@ function nets(balances: Record<string, Balance>) {
 describe('participantsOf', () => {
   it('排除不參與者，且只計目前的成員（依加入順序）', () => {
     expect(participantsOf(expense('e', 'a', 100, ['b', 'ghost']), abc)).toEqual(['a', 'c'])
-  })
-})
-
-describe('shareOf', () => {
-  it('整除時兩種模式相同', () => {
-    expect(shareOf(90, 3, 'ceil')).toBe(30)
-    expect(shareOf(90, 3, 'floor')).toBe(30)
-  })
-  it('除不盡時進位或捨去', () => {
-    expect(shareOf(100, 3, 'ceil')).toBe(34)
-    expect(shareOf(100, 3, 'floor')).toBe(33)
-  })
-  it('沒有參與者為 0', () => {
-    expect(shareOf(100, 0, 'ceil')).toBe(0)
   })
 })
 
@@ -66,6 +51,30 @@ describe('computeBalances', () => {
       expect(Object.values(b).reduce((sum, x) => sum + x.net, 0)).toBe(0)
       expect(b.a!.paid).toBe(1000)
     }
+  })
+
+  it('先加總精確金額再取整：500 與 1,000 都三人分，每人剛好負擔 500', () => {
+    const expenses = [expense('e1', 'a', 500), expense('e2', 'a', 1000)]
+    for (const rounding of ['ceil', 'floor'] as const) {
+      expect(nets(computeBalances(abc, expenses, rounding))).toEqual({ a: 1000, b: -500, c: -500 })
+    }
+  })
+
+  it('多位應收款人時，進位多出的零頭依比例分配，收付總額一致', () => {
+    // a、b 各付 100 三人分：a、b 各應收 33.33，c 應付 66.67
+    const expenses = [expense('e1', 'a', 100), expense('e2', 'b', 100)]
+    expect(nets(computeBalances(abc, expenses, 'ceil'))).toEqual({ a: 34, b: 33, c: -67 })
+    expect(nets(computeBalances(abc, expenses, 'floor'))).toEqual({ a: 33, b: 33, c: -66 })
+  })
+
+  it('零頭依各人按比例分配後的小數部分決定，總額仍一致', () => {
+    // 四人分：a 應收 200.5、b 應收 0.5，c、d 各應付 100.5 → 進位後各付 101，共 202
+    // 按比例 a 分到 201.50、b 分到 0.50，最後 1 元零頭給小數部分較大的 b
+    const abcd = [...abc, member('d')]
+    const expenses = [expense('e1', 'a', 301), expense('e2', 'b', 101)]
+    const result = nets(computeBalances(abcd, expenses, 'ceil'))
+    expect(Object.values(result).reduce((x, y) => x + y, 0)).toBe(0)
+    expect(result).toEqual({ a: 201, b: 1, c: -101, d: -101 })
   })
 
   it('沒有參與者或付款人已不在名單的帳目不計入', () => {

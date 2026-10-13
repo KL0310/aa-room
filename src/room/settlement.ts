@@ -5,22 +5,22 @@ export function participantsOf(expense: Expense, members: Member[]): string[] {
   return members.filter((m) => !expense.excludedIds.includes(m.id)).map((m) => m.id)
 }
 
-/** 每位參與者應分攤的整數金額 */
-export function shareOf(amount: number, participantCount: number, rounding: RoundingMode): number {
-  if (participantCount <= 0) return 0
-  const exact = amount / participantCount
-  return rounding === 'ceil' ? Math.ceil(exact) : Math.floor(exact)
-}
-
 /** 沒有任何參與者的帳目無法分攤，必須先處理才能結算 */
 export function unsettleableExpenses(expenses: Expense[], members: Member[]): Expense[] {
   return expenses.filter((e) => participantsOf(e, members).length === 0)
 }
 
+/** 浮點數累加的誤差容忍度；金額都是整數，遠小於 1 的誤差不影響取整 */
+const EPSILON = 1e-6
+
 /**
  * 計算每位成員的收支。
- * 以「每筆帳目、每位非付款人的分攤額」為單位取整：非付款人各付 shareOf 給付款人，
- * 付款人實際負擔的部分 = 金額 − 其他人付給他的總和，因此所有人的 net 加總恆為 0。
+ * 先以精確金額（含小數）累加每個人的收支，最後才取整一次，避免每筆帳目各自取整造成誤差累積
+ * （例如 500 與 1,000 都三人分，每人應負擔剛好 500，而不是 167 + 334 = 501）。
+ *
+ * 取整方式：
+ * - 應付的人：依 rounding 對應付總額進位或捨去
+ * - 應收的人：把應付方實際付出的總額，依各自應收的精確金額比例分配成整數，確保收付總額一致
  */
 export function computeBalances(
   members: Member[],
@@ -28,28 +28,66 @@ export function computeBalances(
   rounding: RoundingMode,
 ): Record<string, Balance> {
   const paid = new Map<string, number>()
-  const net = new Map<string, number>()
+  const exact = new Map<string, number>()
   for (const m of members) {
     paid.set(m.id, 0)
-    net.set(m.id, 0)
+    exact.set(m.id, 0)
   }
   for (const expense of expenses) {
     if (!paid.has(expense.payerId)) continue
     const participants = participantsOf(expense, members)
     if (participants.length === 0) continue
     paid.set(expense.payerId, paid.get(expense.payerId)! + expense.amount)
-    const share = shareOf(expense.amount, participants.length, rounding)
-    for (const id of participants) {
-      if (id === expense.payerId) continue
-      net.set(id, net.get(id)! - share)
-      net.set(expense.payerId, net.get(expense.payerId)! + share)
-    }
+    exact.set(expense.payerId, exact.get(expense.payerId)! + expense.amount)
+    const share = expense.amount / participants.length
+    for (const id of participants) exact.set(id, exact.get(id)! - share)
   }
+
+  const net = new Map<string, number>(members.map((m) => [m.id, 0]))
+  let totalDebt = 0
+  for (const m of members) {
+    const value = exact.get(m.id)!
+    if (value >= -EPSILON) continue
+    const debt = rounding === 'ceil' ? Math.ceil(-value - EPSILON) : Math.floor(-value + EPSILON)
+    net.set(m.id, -debt)
+    totalDebt += debt
+  }
+  const creditors = members.filter((m) => exact.get(m.id)! > EPSILON).map((m) => ({ id: m.id, credit: exact.get(m.id)! }))
+  for (const [id, amount] of apportion(totalDebt, creditors)) net.set(id, amount)
+
   const result: Record<string, Balance> = {}
   for (const m of members) {
     const p = paid.get(m.id)!
     const n = net.get(m.id)!
     result[m.id] = { paid: p, share: p - n, net: n }
+  }
+  return result
+}
+
+/**
+ * 依比例把整數總額分配給應收款的人（最大餘數法）：
+ * 先取每人按比例的整數部分，剩下的零頭依小數部分由大到小各給 1，
+ * 小數部分相同時給應收較多者，再相同則依加入順序。
+ */
+function apportion(total: number, creditors: Array<{ id: string; credit: number }>): Map<string, number> {
+  const result = new Map<string, number>()
+  const sum = creditors.reduce((acc, c) => acc + c.credit, 0)
+  if (creditors.length === 0 || total <= 0 || sum <= 0) {
+    for (const c of creditors) result.set(c.id, 0)
+    return result
+  }
+  const quotas = creditors.map((c, order) => {
+    const quota = (c.credit * total) / sum
+    const base = Math.floor(quota + EPSILON)
+    return { ...c, order, base, fraction: quota - base }
+  })
+  let remainder = total - quotas.reduce((acc, q) => acc + q.base, 0)
+  const ranked = [...quotas].sort(
+    (a, b) => b.fraction - a.fraction || b.credit - a.credit || a.order - b.order,
+  )
+  for (const q of ranked) {
+    result.set(q.id, q.base + (remainder > 0 ? 1 : 0))
+    if (remainder > 0) remainder--
   }
   return result
 }
